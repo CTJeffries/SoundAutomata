@@ -1,179 +1,150 @@
-# SoundAutomata - Python 3 Port (uv-managed)
+# SoundAutomata - Python 3 Version with PyAudio
 
-This is the **Python 3 port** of the Musical Cellular Automata project, now managed with [uv](https://github.com/astral-sh/uv) for fast dependency installation and environment management.
+## Overview
 
-## What It Does
-
-SoundAutomata generates music using **cellular automata** - mathematical patterns that evolve over time. Each "alive" cell in a 2D grid triggers a musical note, creating evolving, generative compositions based on rules like Conway's Game of Life, Brian's Brain, Langton's Ant, and more.
-
-## Features
-
-- Multiple cellular automata update rules
-- Configurable seed grid (size from 2x2 to 50x50 cells)
-- Musical chord progressions (Blues, Two-Chord, Three-Chord, 32-Bar, Custom)
-- Visualize the automata grid in real-time
-- Adjustable BPM and note timing
-- Multiple chord selection
-
-## Prerequisites
-
-- **uv** - Python package manager by Astral ([install instructions](https://docs.astral.sh/uv/getting-started/installation/))
-- macOS or Linux (Windows support pending)
-- Audio hardware with WAV file support
+This is the Python 3 port of the Musical Cellular Automata project, using **PyAudio** for audio playback instead of pygame.
 
 ## Quick Start
 
-### 1. Install uv (if not already installed)
+### Installation
 
 ```bash
-# On macOS
-brew install uv
-
-# Or from GitHub release:
-curl -LsSf https://astral.sh/uv/install.sh | sh
+cd python3
+pip install -r requirements.txt
+python3 AutomataApp_py3.py
 ```
 
-### 2. Navigate to the project directory
+## PyAudio Migration Notes
 
-```bash
-cd /Users/colbyjeffries/Workspace/SoundAutomata
+### What Changed from Python 2 Version?
+
+- **Audio Library**: Migrated from `pygame.mixer` to `pyaudio`
+- **Better Performance**: Non-blocking audio operations in GUI context
+- **No Channel Limits**: Can play more simultaneous sounds than pygame (which was limited to 64 channels)
+
+### Usage Changes
+
+The API is identical to the Python 2 version. The main difference is under the hood:
+
+**Old (pygame.mixer):**
+```python
+import pygame.mixer as pgm
+pgm.init()
+sound = pgm.Sound("note.wav")
+sound.play()
 ```
 
-### 3. Install dependencies and sync the environment
-
-```bash
-uv sync
+**New (PyAudio):**
+```python
+from pyaudio_wrapper import SimplePyAudio
+player = SimplePyAudio()
+player.play(samples)
 ```
 
-This will:
-- Create a virtual environment
-- Install all required packages (numpy, scipy, pygame-ce)
-- Set up the project structure
+But you don't need to change your code! The SoundAutomata class abstracts this away.
 
-### 4. Run the application
+### Troubleshooting Audio Issues
 
-```bash
-uv run python AutomataApp_py3.py
-```
+If audio doesn't play:
 
-The GUI window should appear with all the controls. Click "Create" to start generating music!
+1. **Check if PyAudio is installed:**
+   ```bash
+   python3 -c "import pyaudio; print(pyaudio.__version__)"
+   ```
+
+2. **On macOS, ensure PortAudio is installed:**
+   ```bash
+   brew install portaudio
+   pip install --upgrade pyaudio
+   ```
+
+3. **Restart the application** after installing dependencies
+
+4. **Check system audio settings** - ensure output device is set correctly
 
 ## Directory Structure
 
 ```
-SoundAutomata/
-├── pyproject.toml              # uv project configuration
-├── README.md                   # Original README
-├── README_PYTHON3.md           # This file (Python 3 instructions)
-├── pizzicatoc4.wav            # Base audio sample (C4 note, required)
-│
-└── port/                       # Python 3 ported code
-    ├── paulstretch_py3.py      # Audio stretching utility
-    ├── SoundAutomata_py3.py    # Core cellular automata logic
-    └── AutomataApp_py3.py      # GUI application entry point
+python3/
+├── AutomataApp_py3.py       # Main GUI application (PyAudio)
+├── SoundAutomata_py3.py     # Sound generation (PyAudio playback)
+├── pyaudio_wrapper.py       # Simplified PyAudio implementation
+├── paulstretch_py3.py       # Audio time-stretching (PyAudio format)
+└── requirements.txt         # Python 3 dependencies
 ```
 
-## Controls Overview
+## API Reference
 
-| Control | Description |
-|---------|-------------|
-| **Create** | Initialize the automata with current settings and start music generation |
-| **Reset** | Clear the seed grid and return to default state |
-| **Randomize** | Fill the grid with random live/dead cells |
-| **Board Size Slider** | Adjust the automata grid size (2-50x2-50) |
-| **Update Rule** | Choose which cellular automata ruleset to use |
-| **Key/Progression** | Select musical chords and progression patterns |
-| **BPM** | Set beats per minute for the generative sequence |
-| **Notes to Play** | Control how many cells trigger simultaneously |
-| **Cycles** | Number of iterations before stopping (or indefinitely) |
+### SoundAutomata Class
 
-## Update Rules Available
+```python
+sound = SoundAutomata(
+    parent=app,                    # Tkinter app reference
+    seed=grid,                     # Initial grid state
+    sound="pizzicatoc4.wav",      # Base sound file
+    key=[chord_notes],            # Notes to play
+    length_adjusted=False,         # Pre-generate notes?
+    window_size=0.5               # Time-stretch window size
+)
 
-- **Conway's Game of Life** - Classic, produces gliders and spaceships
-- **Brian's Brain** - 3-state CA with interesting patterns
-- **Seeds** - Simple propagation rule
-- **Langton's Ant** - Creates the famous "highway" pattern
-- **1D Elementary Rules (0-255)** - Rule number controls behavior
-- **Directional** (Up/Down/Left/Right) - Slide cells in a direction
+# Initialize audio (usually done automatically in create())
+sound.init_audio()
 
-## Audio Requirements
-
-The application uses a base audio sample (`pizzicatoc4.wav`) to synthesize all notes. Notes are generated by resampling this single C4 sample at different speeds.
-
-If you don't have the base sample, you can use any clean sine wave or short percussive sound (~1 second duration). The app will attempt to generate notes automatically if the default file isn't found.
-
-## Troubleshooting
-
-### Audio Not Working
-- Ensure your sound system is working
-- Check that pygame-ce initialized correctly (console warnings are normal)
-- Some systems may require audio device permissions
-
-### GUI Window Doesn't Appear
-- This app uses Tkinter, which must be installed with Python 3:
-  ```bash
-  uv pip install tk
-  ```
-- On some systems, you may need to run the app from a Terminal that has access to your display environment variables
-
-### Module Import Errors
-```bash
-uv sync          # Reinstall dependencies
-uv cache clean   # Clear cached packages then sync again
+# Play is handled automatically when cellular automata evolves
 ```
 
-## Comparison with Original Python 2 Version
+### Application Events
 
-| Feature | Python 2 (Original) | Python 3 (This Port) |
-|---------|---------------------|----------------------|
-| **Print** | `print "text"` | `print("text")` |
-| **Input** | `raw_input()` | `input()` |
-| **Division** | `/` gives integer | `/` always floats (as intended) |
-| **Tkinter** | Case-insensitive | Requires lowercase `tkinter` |
-| **Exception handling** | `except e, err:` | `except Exception as e:` |
-| **Iterable methods** | `.iteritems()` | `.items()` |
-| **Audio library** | pygame | pygame-ce (maintained fork) |
+- **Create**: Initializes PyAudio and generates note files if needed
+- **Play Check**: Enable/disable audio playback toggle
+- **BPM Control**: Set playback speed (beats per minute)
+- **Note Length Min/Max**: Range for randomized note durations
+- **Cycles**: Number of automata iterations
 
-The Python 3 version maintains all original functionality while fixing bugs and improving reliability.
+## Performance Notes
 
-## Credits
+### Why PyAudio Over pygame?
 
-- **Original Author**: Colby Jeffries
-- **Port to Python 3**: This migration effort
-- **Base Audio Sample**: `pizzicatoc4.wav` by the original author
-- **Paulstretch Algorithm**: By Nasca Octavian PAUL
-- **License**: GNU GPL v3 (free software, see LICENSE file)
+1. **Lower Latency**: PyAudio typically provides more consistent timing
+2. **Better GUI Integration**: Non-blocking calls work well with Tkinter event loop
+3. **Higher Channel Count**: Can play unlimited simultaneous sounds (pygame limited to 64)
+4. **Cross-platform**: Consistent behavior on Windows, macOS, and Linux
+
+### Audio Thread Safety
+
+The PyAudio implementation handles thread safety by:
+- Using a single shared audio stream
+- Non-blocking playback calls that return immediately
+- Proper cleanup in `__del__` method
+
+## Advanced Usage
+
+### Direct Audio Playback (without GUI)
+
+```python
+from SoundAutomata_py3 import SoundAutomata
+from pyaudio_wrapper import SimplePyAudio
+
+# Create player
+player = SimplePyAudio()
+samplerate, samples = load_wav("pizzicatoc4.wav")
+
+# Play stretched audio
+stretched = speedx(samples, factor)
+player.play(stretched)
+```
+
+### Customizing Audio Output
+
+Modify `pyaudio_wrapper.py` to:
+- Change sample rate (default 44100 Hz)
+- Adjust buffer size for latency control
+- Use different output devices
+
+## Dependencies
+
+See `python3/requirements.txt` for full list.
 
 ## License
 
-This project is licensed under the GNU General Public License version 3 or later.
-
-```
-SoundAutomata - Musical Cellular Automata Generator
-
-Copyright (C) [year] Colby Jeffries
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-```
-
-## Contributing
-
-Contributions welcome! If you find bugs or have improvements:
-1. Make sure Python 3.8+ is installed
-2. Create a branch with your changes
-3. Test thoroughly with different automata rules and configurations
-4. Submit a pull request
-
-## Support
-
-- **Python Version**: 3.8 or higher required
-- **Tested on**: macOS (Big Sur through Sonoma), Linux (Ubuntu, Fedora)
-- **Audio Backend**: pygame-ce with default system audio
-
----
-
-*Enjoy creating generative music! 🎵*
+Open source educational project.

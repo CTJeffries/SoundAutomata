@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Colby Jeffries
-Musical Cellular Automata - Python 3 Port
+Musical Cellular Automata - Python 3 Port (PyAudio version)
 
 SoundAutomata.py contains the SoundAutomata class. Governs the cellular automata and all
-audio generation."""
+audio generation using PyAudio instead of pygame.mixer."""
 
 import time
 import wave
@@ -13,14 +13,26 @@ import copy
 import math
 import random
 from pathlib import Path
+from typing import Optional, List
 
 import numpy as np
-import pygame.mixer as pgm
-import pygame.sndarray as pgsa
+
+# Import PyAudio wrapper instead of pygame mixer
+try:
+    from pyaudio_wrapper import (
+        PyAudioNote, PyAudioMixer, load_wav, save_wav, init_audio, cleanup_audio, note_play
+    )
+except ImportError:
+    # Fallback to local implementation if wrapper not found
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from pyaudio_wrapper import (
+        PyAudioNote, PyAudioMixer, load_wav, save_wav, init_audio, cleanup_audio, note_play
+)
 
 
 class SoundAutomata:
-    """Governs the cellular automata and audio generation."""
+    """Governs the cellular automata and audio generation using PyAudio."""
 
     def __init__(self, parent, seed=np.random.randint(2, size=(4, 4)),
                  sound="sinec4.wav", key=[[-5, -1, 2, 7, 14, 19]],
@@ -36,12 +48,11 @@ class SoundAutomata:
         self.size = len(self.game_board[1])
         self.game_board_temp = copy.deepcopy(self.game_board)
         self.key = key
-        self.generate_notes()
-        self.note_array = []
-        for i in self.key:
-            self.note_array.append([pgm.Sound(Path(f"{self.basic_note[:-4]}/{j}.wav")) for j in i])
+        # Initialize PyAudio mixer (for GUI applications, init on first play or in create())
+        self.mixer = None
         self.current_note = 0
         self.current_key = 0
+        self.initialized = False
 
     def count_neighbors(self, x, y):
         """Count the number of alive neighbors in a cell's Moore neighborhood."""
@@ -230,72 +241,129 @@ class SoundAutomata:
         return snd_array[indices]
 
     def generate_notes(self):
-        """Generates audio files for all pitches based on the original sound."""
+        """Generate audio files for all pitches based on the original sound."""
         from pathlib import Path
 
         # Create notes directory if it doesn't exist
         notes_dir = Path(self.basic_note[:-4])
         notes_dir.mkdir(parents=True, exist_ok=True)
 
-        for i in range(-36, 60):
-            for key_chord in self.key:
-                if i in key_chord:
-                    if not (notes_dir / f"{i}.wav").exists():
-                        factor = 2 ** (1.0 * i / 12.0)
+        # Load base sound
+        base_note_path = Path(self.basic_note[:-4]) / "pizzicatoc4.wav"
+        if not base_note_path.exists():
+            print(f"Warning: {base_note_path} not found. Cannot generate notes.")
+            return
 
-                        # Load base sound
-                        base_note_path = Path(self.basic_note[:-4]) / "pizzicatoc4.wav"
-                        if not base_note_path.exists():
-                            continue
-
-                        samplerate, smp = self._load_wav(self.basic_note)
-                        if samplerate is None:
-                            continue
-
-                        # Stretch audio
-                        stretched_path = f"{self.basic_note[:-4]}temp.wav"
-                        self._paulstretch(samplerate, smp, factor, self.window_size, stretched_path)
-
-                        # Load and speed up
-                        note = pgm.Sound(stretched_path)
-
-                        basic_note_array = pgsa.array(note)
-                        basic_note_resampled = []
-
-                        for ch in range(basic_note_array.shape[1]):
-                            sound_channel = basic_note_array[:, ch]
-                            resampled = self.speedx(sound_channel, factor)
-                            basic_note_resampled.append(resampled)
-
-                        # Write new note file
-                        note_out = pgsa.make_sound(np.array(basic_note_resampled).copy(order='C'))
-
-                        note_file = wave.open(notes_dir / f"{i}.wav", 'w')
-                        note_file.setframerate(44100)
-                        note_file.setnchannels(2)
-                        note_file.setsampwidth(2)
-                        note_file.writeframesraw(note_out.get_raw())
-                        note_file.close()
-
-        if Path(f"{self.basic_note[:-4]}temp.wav").exists():
-            os.remove(f"{self.basic_note[:-4]}temp.wav")
-
-    def _load_wav(self, filename):
-        """Helper to load WAV files with error handling."""
         try:
-            from scipy.io.wavfile import read as read_wav
-            samplerate, smp = read_wav(filename)
-            # Convert int16 to float
-            smp = smp.astype(np.float32) / 32768.0
-            return (samplerate, smp.transpose())
-        except Exception as e:
-            print(f"Error loading wav: {filename}")
-            return None
+            samplerate, smp = load_wav(str(base_note_path))
+            if samplerate is None:
+                print("Error: Could not load base sound file.")
+                return
 
-    def _paulstretch(self, samplerate, smp, stretch, window_size_seconds, outfilename):
-        """Internal stub for paulstretch - delegate to actual module."""
-        from paulstretch_py3 import paulstretch as ps_stretch
-        ps_stretch(samplerate, smp, stretch, window_size_seconds, outfilename)
+            # Generate all pitches from -36 to 59 semitones
+            for i in range(-36, 60):
+                note_file = Path(self.basic_note[:-4]) / f"{i}.wav"
+                if not note_file.exists():
+                    # Calculate stretch factor
+                    factor = 2 ** (1.0 * i / 12.0)
+
+                    # Stretch audio using paulstretch module
+                    from paulstretch_py3 import paulstretch as ps_stretch
+                    stretched_path = str(Path(self.basic_note[:-4]) / "temp.wav")
+                    ps_stretch(samplerate, smp, factor, self.window_size, stretched_path)
+
+                    # Load stretched and speed up audio
+                    note_samples = load_wav(stretched_path)
+                    if note_samples is None:
+                        continue
+
+                    basic_note_resampled = []
+                    for ch in range(note_samples[0].shape[1]):
+                        sound_channel = note_samples[0][:, ch]
+                        resampled = self.speedx(sound_channel, factor)
+                        basic_note_resampled.append(resampled)
+
+                    # Write new note file
+                    note_file_array = np.array(basic_note_resampled).copy(order='C')
+                    samples_to_write = (note_file_array * 32767).astype(np.int16)
+
+                    note_wav = wave.open(note_file, 'wb')
+                    note_wav.setframerate(44100)
+                    note_wav.setnchannels(2)
+                    note_wav.setsampwidth(2)
+                    note_wav.writeframes(samples_to_write.tobytes())
+                    note_wav.close()
+
+        finally:
+            # Cleanup temp file
+            temp_path = Path(self.basic_note[:-4]) / "temp.wav"
+            if temp_path.exists():
+                os.remove(temp_path)
+
+    def load_and_load_notes(self):
+        """Load all notes into memory using PyAudio."""
+        from pathlib import Path
+
+        notes_dir = Path(self.basic_note[:-4])
+
+        self.note_array = []
+        for key_chord in self.key:
+            chord_notes = []
+            for i in key_chord:
+                note_path = notes_dir / f"{i}.wav"
+                if note_path.exists():
+                    # Load note with PyAudioNote
+                    try:
+                        note = PyAudioNote(str(note_path))
+                        chord_notes.append(note)
+                    except Exception as e:
+                        print(f"Error loading note {note_path}: {e}")
+                        chord_notes.append(None)
+                else:
+                    chord_notes.append(None)
+            self.note_array.append(chord_notes)
+
+    def load_notes(self):
+        """Load all generated notes into PyAudioNote objects."""
+        from pathlib import Path
+
+        notes_dir = Path(self.basic_note[:-4])
+
+        self.note_array = []
+        for key_chord in self.key:
+            chord_notes = []
+            for i in key_chord:
+                note_path = notes_dir / f"{i}.wav"
+                if note_path.exists():
+                    # Load note with PyAudioNote
+                    try:
+                        note = PyAudioNote(str(note_path))
+                        chord_notes.append(note)
+                    except Exception as e:
+                        print(f"Error loading note {note_path}: {e}")
+                        chord_notes.append(None)
+                else:
+                    chord_notes.append(None)
+            self.note_array.append(chord_notes)
+
+    def init_audio(self):
+        """Initialize PyAudio mixer for playback."""
+        try:
+            self.mixer = PyAudioMixer(rate=44100, chunk=1024)
+            if not self.mixer.init():
+                print("Warning: Could not initialize audio. Audio playback will be disabled.")
+                return False
+        except Exception as e:
+            print(f"Error initializing audio: {e}")
+            print("Audio playback will be disabled.")
+            return False
+
+        self.initialized = True
+        return True
+
+    def no_init(self):
+        """Check if mixer was initialized."""
+        return self.mixer is not None and self.mixer.get_init()
 
     def play(self, notelen, num, music_check):
         """Plays one time step of the cellular automata."""
@@ -314,12 +382,32 @@ class SoundAutomata:
             for j in range(num):
                 if self.game_board[self.current_note][to_play[j]]:
                     volume = 1 / self.game_board[self.current_note][to_play[j]]
-                    self.note_array[self.current_key][to_play[j] % len(
-                        self.key[self.current_key])].set_volume(volume)
-                    # Note: pygame timing with start time in seconds (ms converted)
-                    if notelen and notelen > 0:
-                        self.note_array[self.current_key][to_play[j] % len(self.key[
-                            self.current_key])].play(0, notelen / 1000.0)
+
+                    # Get the note object
+                    note_key = to_play[j] % len(self.key[self.current_key])
+                    notes_row = self.note_array[self.current_key]
+
+                    if notes_row and note_key < len(notes_row):
+                        note_obj = notes_row[note_key]
+
+                        # Initialize audio if not done yet
+                        if not hasattr(self, 'initialized') or not self.initialized:
+                            if not self.init_audio():
+                                print("Note playback disabled.")
+                                return
+
+                        if note_obj and self.no_init():
+                            # Set volume on the note
+                            if hasattr(note_obj, 'set_volume'):
+                                note_obj.set_volume(volume)
+                            # Play the note using PyAudio
+                            if hasattr(note_obj, 'play'):
+                                try:
+                                    note_obj.play()
+                                except Exception as e:
+                                    print(f"Playback error for note {to_play[j]}: {e}")
+
+            self.initialized = True
 
         # Wrap around to next row
         self.current_note = (self.current_note + 1) % self.size
@@ -337,6 +425,7 @@ def main():
     wav_path = "pizzicatoc4.wav"
     if not Path(wav_path).exists():
         print(f"Error: {wav_path} not found in current directory")
+        print("Please place a WAV file named 'pizzicatoc4.wav' in the directory.")
         return
 
     # Create automata instance with default parameters

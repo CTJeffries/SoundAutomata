@@ -9,8 +9,9 @@ This file contains the GUI application with Tkinter interface.
 
 import tkinter as tk
 from tkinter import ttk, font, messagebox
-import SoundAutomata as SoundAutomata
-import pygame.mixer
+import SoundAutomata_py3 as SoundAutomata
+import pyaudio  # Using PyAudio instead of pygame.mixer
+import numpy as np
 import random
 import time
 import copy
@@ -357,15 +358,6 @@ class MainApplication(tk.Frame):
         # Create visualizer window
         window = VisualizerWindow(self, self.seed, self.seed_size, self.cell_width)
 
-        # Initialize pygame mixer (must be done before creating SoundAutomata instance)
-        try:
-            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-            # Pygame may need multiple init calls to handle many channels
-            if not pygame.mixer.get_init():
-                pygame.mixer.init()
-        except Exception as e:
-            self.write(f"Warning: Could not initialize audio mixer: {e}\nAudio will not be available.")
-
         bpm = float(60) / float(self.bpm_entry.get())
         start_time = 0.0
 
@@ -378,6 +370,7 @@ class MainApplication(tk.Frame):
 
         # Create sound generator with simplified parameters for Python 3 compatibility
         try:
+            # Initialize sound generator with PyAudio support
             sound_generator = SoundAutomata.SoundAutomata(
                 parent=self,
                 seed=self.seed,
@@ -386,10 +379,23 @@ class MainApplication(tk.Frame):
                 length_adjusted=False,
                 window_size=0.5
             )
+
         except Exception as e:
             self.write(f"Error creating automata: {e}")
             window.destroy()
             return
+
+        # Initialize PyAudio mixer for audio playback
+        try:
+            self.audio_initialized = False
+            sound_generator.init_audio()
+            if sound_generator.no_init():
+                self.audio_initialized = True
+                print("PyAudio mixer initialized successfully.")
+        except Exception as e:
+            self.write(f"Warning: Could not initialize PyAudio: {e}")
+            self.audio_initialized = False
+            print("Audio playback will be disabled.")
 
         prog_pos = 0
         for i in range(self.cycles_entry_val.get()):
@@ -399,6 +405,12 @@ class MainApplication(tk.Frame):
                 break
 
             try:
+                # Generate notes before playing (if not already generated)
+                if hasattr(sound_generator, 'generate_notes'):
+                    sound_generator.generate_notes()
+                # Load all notes into memory
+                sound_generator.load_and_load_notes()
+
                 # Update visualization and play notes for each cell position
                 for j in range(self.seed_size):
                     window.update(sound_generator.game_board, (sound_generator.current_note - 1) % self.seed_size)
@@ -412,9 +424,11 @@ class MainApplication(tk.Frame):
                     num_notes = self.to_play_scale.get()
                     if sound_generator.game_board[sound_generator.current_note].any():
                         note_length = random.randint(int(self.note_length_min.get()),
-                                                     int(self.note_length_max.get()))
-                        if self.play_check_val.get() and pygame.mixer.get_init():
-                            sound_generator.play(note_length / 1000.0, num_notes, True)
+                                                     int(self.note_length_max.get())) / 1000.0
+
+                        # Play notes if audio is initialized
+                        if self.play_check_val.get() and self.audio_initialized:
+                            sound_generator.play(note_length, num_notes, True)
 
                     start_time = time.time()
 
@@ -444,6 +458,13 @@ class MainApplication(tk.Frame):
             window.destroy()
         except Exception:
             pass
+
+        # Cleanup audio on exit
+        if sound_generator.mixer:
+            try:
+                cleanup_audio(sound_generator.mixer)
+            except Exception:
+                pass
 
 
 class VisualizerWindow(tk.Toplevel):
@@ -591,29 +612,34 @@ class ColorSelectWindow(tk.Toplevel):
         self.destroy()
 
 
-class MainApplication(tk.Frame):
-    """Main application class with entry point."""
+def main(root):
+    """Entry point for the Tkinter application."""
+    root = tk.Tk()
+    root.wm_title("Musical Cellular Automata - PyAudio Version")
+    root.resizable(width=False, height=False)
 
-    @staticmethod
-    def main(root):
-        """Entry point for the Tkinter application."""
-        root = tk.Tk()
-        root.wm_title("Musical Cellular Automata - Python 3 Port")
-        root.resizable(width=False, height=False)
+    app = MainApplication(root)
+    app.grid(row=0, column=0, sticky="nsew")
 
-        app = MainApplication(root)
-        app.grid(row=0, column=0, sticky="nsew")
+    # Initialize PyAudio mixer (for GUI applications)
+    try:
+        audio = pyaudio.PyAudio()
+        audio.stream = audio.open(
+            format=pyaudio.paInt16,
+            channels=2,
+            rate=44100,
+            output=True,
+            output_device_index=None,  # Use default output device
+            exclusive=False
+        )
+        audio.stream.start_stream()
+    except ImportError:
+        print("PyAudio not installed. Audio playback will be disabled.")
+    except Exception as e:
+        print(f"Warning: Audio initialization failed: {e}")
+        print("The app will still run without audio playback.")
 
-        # Initialize pygame mixer
-        try:
-            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-            if not pygame.mixer.get_init():
-                pygame.mixer.init()
-        except Exception as e:
-            print(f"Warning: Audio initialization failed: {e}")
-            print("The app will still run without audio playback.")
-
-        root.mainloop()
+    root.mainloop()
 
 
 if __name__ == "__main__":
