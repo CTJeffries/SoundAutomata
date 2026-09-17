@@ -2,107 +2,87 @@
 
 ## About
 
-This is a project to generate audio using cellular automata. The project uses the Python programming language, tkinter for the GUI, and pyaudio for audio playback.
+This project generates musical audio using cellular automata rules. It uses Python 3, Textual (v0.4+) for the GUI, and PyAudio for real-time audio playback with time-stretching support.
 
 ## Project Structure
 
 ```
 SoundAutomata/
-├── python3/                     # Modern Python 3 version (with PyAudio)
-│   ├── SoundAutomata_py3.py     # Main sound generation class
-│   ├── AutomataApp_py3.py       # GUI application with Tkinter
-│   ├── pyaudio_wrapper.py       # PyAudio implementation
-│   └── paulstretch_py3.py       # Audio time-stretching utility
-├── python2/                     # Legacy Python 2 version (deprecated)
-├── pizzicatoc4.wav              # Base sound file
-├── MIGRATION_SUMMARY.md         # Migration details
-└── README.md                    # This file
+├── App.py                         # PRIMARY: Textual GUI application
+├── SoundAutomata.py               # Core cellular automata logic
+├── ColorSelectModal.py            # Color selection modal
+├── NotesSelectModal.py            # Chord/notes selection modal  
+├── pyaudio_wrapper.py             # PyAudio mixer abstraction
+├── paulstretch.py                 # Time-stretching audio processing
+├── examples/                      # Textual GUI demo files
+├── python3/                       # Python 2 version (legacy)
+├── docs/                          # Documentation
+├── pizzicatoc4.wav               # Default audio file
+└── requirements.txt               # Python dependencies
 ```
 
-## Installation
+## Quick Start
 
-### Dependencies
+### Installation
 
-- Python 3.8+
-- pip
-- [pyaudio](https://people.csail.mit.edu/hubert/pyaudio/) (audio playback)
-- [numpy](https://numpy.org/) (scientific computing)
-- [scipy](https://www.scipy.org/) (signal processing)
-
-### Installation Steps
-
-1. **Install dependencies:**
+1. **Navigate to the project:**
    ```bash
-   pip install -r python3/requirements.txt
+   cd SoundAutomata
    ```
 
-2. **On macOS** (if pyaudio installation fails):
+2. **Install dependencies:**
    ```bash
-   brew install portaudio
-   pip install pyaudio
+   uv sync
    ```
 
-3. **On Ubuntu/Debian:**
-   ```bash
-   sudo apt-get update
-   sudo apt-get install python3-pyaudio libportaudio0 libportaudio2-dev
-   ```
+   **Dependencies:**
+   - Python 3.8+
+   - [Textual](https://textual.textualize.io/) (v0.4+) - GUI framework
+   - [pyaudio](https://people.csail.mit.edu/hubert/pyaudio/) - Audio playback
+   - numpy, scipy
 
-## Usage
+3. **Audio setup:**
+   - macOS: `brew install portaudio` (uv will handle pyaudio installation)
+   - Ubuntu/Debian: `sudo apt-get install python3-pyaudio libportaudio0 libportaudio2-dev`
 
 ### Running the Application
 
+**Textual version (PRIMARY):**
 ```bash
-cd python3
-python3 AutomataApp_py3.py
-```
-
-### Command Line
-
-For direct audio generation without GUI:
-```bash
-python3 SoundAutomata_py3.py
+python3 App.py
 ```
 
 ## Features
 
-- Generate musical notes from a base sound sample
-- Multiple cellular automata rules (Conway's Game of Life, Brian's Brain, Langton's Ant, etc.)
-- Configurable note playback timing (BPM control)
-- Visual representation of the automata grid
-- Support for multiple chords and progressions
+- **Real-time audio playback** with PyAudio and time-stretching
+- **Cellular automata rules**: Conway's Game of Life, Brian's Brain, Langton's Ant, etc.
+- **Multi-note/chord support** with configurable progressions
+- **Visual grid** for seed pattern creation and evolution viewing
+- **Modal dialogs** for color and note selection
 
-## Audio Playback (PyAudio)
+## Audio System
 
-This project now uses **PyAudio** instead of `pygame` for audio playback. PyAudio provides:
+The audio system uses PyAudio with a custom mixer wrapper that supports:
 
-- Better performance and consistent timing
-- GUI-friendly non-blocking operations
-- No channel limits (unlike pygame's 64-channel limitation)
-- Cross-platform compatibility
+- Real-time playback without blocking the GUI thread
+- Time-stretching using PaulStretch algorithm
+- Dynamic sample rate handling
+- Efficient buffer management
 
-### Audio Setup
-
-The application automatically initializes PyAudio on startup. If initialization fails, the app will continue running without audio playback.
-
-## Project History
-
-This project was originally developed in Python 2 using pygame for audio. It has been modernized to:
-
-1. Use PyAudio for improved audio playback
-2. Run on Python 3 with modern libraries
-3. Maintain compatibility with Tkinter GUI framework
+See `pyaudio_wrapper.py` and `paulstretch.py` for implementation details.
 
 ## License
 
 This project is open source and available for educational purposes.
 
-## Author
-
-Colby Jeffries
-
 ## See Also
 
+- [Textual Documentation](https://textual.textualize.io/)
 - [PyAudio Documentation](https://people.csail.mit.edu/hubert/pyaudio/)
-- [numpy documentation](https://numpy.org/doc/)
-- [scipy documentation](https://docs.scipy.org/doc/scipy/)
+- [NumPy Documentation](https://numpy.org/doc/)
+- [SciPy Documentation](https://docs.scipy.org/doc/scipy/)
+- [PaulStretch Time-Stretching](https://github.com/danibvie/paulstretch)
+
+## Author
+
+Colby Jeffries 🎵

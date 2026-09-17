@@ -6,46 +6,47 @@ A musical visualization and sound synthesis project using cellular automata. Thi
 
 ```
 SoundAutomata/
-├── docs/                 # Documentation (top level, shared between both versions)
-│   ├── LICENSE          # Project license
-│   ├── MIGRATION_NOTES.md  # Guide for Python 2 to Python 3 migration
-│   ├── PORT_COMPLETE.md    # Port completion status
-│   ├── pyproject.toml     # Python project configuration
-│   └── README.md         # This file
-├── python2/              # Original Python 2 version
+├── App.py                      # PRIMARY: Textual GUI application
+├── SoundAutomata.py            # Core cellular automata logic
+├── ColorSelectModal.py         # Color selection modal
+├── NotesSelectModal.py         # Chord/notes selection modal
+├── pyaudio_wrapper.py          # PyAudio mixer abstraction
+├── paulstretch.py              # Time-stretching audio processing
+├── examples/                   # Textual GUI demo files
+├── python3/                    # Python 2 version (legacy, now unused)
+│   └── uv.lock                 # Dependency lock file
+├── python2/                    # Original Python 2 version (deprecated)
 │   ├── AutomataApp.py
 │   ├── SoundAutomata.py
 │   ├── paulstretch.py
-│   └── README.md         # Python 2 specific documentation
-├── python3/              # Python 3 port
-│   ├── AutomataApp_py3.py
-│   ├── SoundAutomata_py3.py
-│   ├── paulstretch_py3.py
-│   ├── run_app.py        # Entry point for Python 3 version
-│   ├── pyproject.toml    # Python dependencies (uv/pip)
-│   ├── README_PYTHON3.md # Python 3 specific documentation
-│   └── __pycache__/      # Python bytecode cache (ignored by .gitignore)
-└── pizzicatoc4.wav       # Default sound file (shared resource)
+│   └── README.md               # Python 2 specific documentation
+├── docs/                       # Documentation (top level, shared between versions)
+│   ├── LICENSE                 # Project license
+│   ├── MIGRATION_NOTES.md      # Guide for Python 2 to Python 3 migration
+│   ├── PORT_COMPLETE.md        # Port completion status
+│   ├── pyproject.toml          # Python project configuration
+│   └── README.md               # This file
+└── pizzicatoc4.wav             # Default sound file (shared resource)
 ```
 
-## Getting Started with Python 3 Version
+## Getting Started with Textual Version (PRIMARY - Recommended)
 
-1. Navigate to the `python3/` directory:
+1. Navigate to the project directory:
    ```bash
-   cd python3
+   cd SoundAutomata
    ```
 
-2. Run the application:
+2. Install dependencies:
    ```bash
-   uv run python run_app.py
+   uv sync
    ```
 
-   Or if you have issues with Python 3.14+ and pygame compatibility:
+3. Run the application:
    ```bash
-   /usr/local/opt/python@3.12/bin/python3 run_app.py
+   python3 App.py
    ```
 
-## Getting Started with Python 2 Version
+## Getting Started with Python 2 Version (Legacy)
 
 1. Navigate to the `python2/` directory:
    ```bash

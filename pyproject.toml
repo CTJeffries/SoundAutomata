@@ -3,15 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sound-automata-py3"
+name = "sound-automata"
 version = "1.0.0"
 description = "Musical Cellular Automata Generator - Python 3 Port"
-readme = "README_PYTHON3.md"
+readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "numpy>=1.24",
     "pygame-ce>=2.5.0",
     "scipy>=1.10",
+    "textual>=0.4.0",
 ]
 
 [tool.hatch.build.targets.wheel]
